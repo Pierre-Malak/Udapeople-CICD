@@ -1,17 +1,45 @@
 version: 2.1
 
-# commands:
-#   destroy-environment:
-#     description: Destroy back-end and front-end cloudformation stacks given a workflow ID
-#     parameters:
-#       # Add parameter here   
-#     steps:
-#       - run:
-#           name: Destroy environments
-#           when: on_fail
-#           command: |
-#             # Your code her
-#             exit 1
+commands:
+  destroy-environment:
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
+    parameters:
+      Workflow_ID:
+        type: string
+        default: ${CIRCLE_WORKFLOW_ID:0:7}
+      # Add parameter here   
+    steps:
+      - run:
+          name: Destroy environments
+          when: on_fail
+          command: |
+              aws cloudformation delete-stack --stack-name udapeople-backend-<<parameters.Workflow_ID>>
+              aws s3 rm s3://udapeople-<<parameters.Workflow_ID>> --recursive
+              aws cloudformation delete-stack --stack-name udapeople-frontend-<<parameters.Workflow_ID>>
+
+  install_awscli:
+    steps:
+      - run:
+          name: Install AWS CLI v2
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install 
+
+  install_nodejs:
+    description: Install Node.js 13.8.0
+    steps:
+      - run:
+          name: Install Node.js 13.8.0
+          command: |
+            # Install Node.js LTS version as our base Node.js version
+            curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+            sudo apt install -y nodejs
+
+            # Use n version manager to use Node.js v13.8.0
+            sudo npm install --global n
+            sudo n 13.8.0
+
 
 #   revert-migrations:
 #     description: Revert the last migration if successfully run in the current workflow.
@@ -140,21 +168,14 @@ jobs:
     steps:
       # Checkout code from git
       - checkout
-      #- install_awscli
-          #description: Install AWS CLI v2
-          # steps:
-            # - run:
-            #     name: Install AWS CLI v2
-            #     command: |
-            #       curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            #       unzip awscliv2.zip
-            #       sudo ./aws/install
-      - run:
-          name: Install AWS CLI v2
-          command: |
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            sudo ./aws/install 
+      - install_awscli
+
+      # - run:
+      #     name: Install AWS CLI v2
+      #     command: |
+      #       curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      #       unzip awscliv2.zip
+      #       sudo ./aws/install 
 
       - run:
           name: Ensure back-end infrastructure exists
@@ -190,26 +211,37 @@ jobs:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
+
+      - destroy-environment
       # Here's where you will add some code to rollback on failure      
 
-#   configure-infrastructure:
-#     docker:
-#       # Docker image here that supports Ansible
-#     steps:
-#       # Checkout code from git
-#       # Add ssh keys with fingerprint
-#       # attach workspace
-#       - run:
-#           name: Install dependencies
-#           command: |
-#             # Your code here
-#             exit 1
-#       - run:
-#           name: Configure server
-#           command: |
-#             # Your code here
-#             exit 1
-#       # Here's where you will add some code to rollback on failure      
+  configure-infrastructure:
+    docker:
+      - image: cimg/base:stable
+      # Docker image here that supports Ansible
+    steps:
+      - checkout
+      - install_ansible
+      # Checkout code from git
+      - add_ssh_keys:
+          fingerprints: [	02:95:f0:3c:05:f7:be:37:f3:ea:d8:50:c9:55:2a:98]
+      # Add ssh keys with fingerprint
+      - attach_workspace:
+          at: ~/
+      # attach workspace
+      # - run:
+      #     name: Install dependencies
+      #     command: |
+      #       # Your code here
+      #       exit 1
+      - run:
+          name: Configure server
+          command: |
+            cd .circleci/ansible
+            cat inventory.txt
+            ansible-playbook -i inventory.txt configure-server.yml
+
+      # Here's where you will add some code to rollback on failure      
 
 #   run-migrations:
 #     docker:
@@ -342,8 +374,8 @@ workflows:
           filters:
             branches:
               only: [United]
-      # - configure-infrastructure:
-      #     requires: [deploy-infrastructure]
+      - configure-infrastructure:
+          requires: [deploy-infrastructure]
       # - run-migrations:
       #     requires: [configure-infrastructure]
       # - deploy-frontend:
