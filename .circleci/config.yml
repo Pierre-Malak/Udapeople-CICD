@@ -10,7 +10,7 @@ version: 2.1
 #           name: Destroy environments
 #           when: on_fail
 #           command: |
-#             # Your code here
+#             # Your code her
 #             exit 1
 
 #   revert-migrations:
