@@ -33,6 +33,8 @@ version: 2.1
 #             fi
             
 jobs:
+ 
+
   build-frontend:
     docker:
       - image: cimg/node:13.8.0
@@ -130,6 +132,8 @@ jobs:
             npm audit fix --force --audit-level=critical
             npm audit --audit-level=critical
 
+
+
   deploy-infrastructure:
     docker:
 
@@ -138,7 +142,7 @@ jobs:
     steps:
       # Checkout code from git
       - checkout
-      - install_awscli
+      #- install_awscli
       - run:
           name: Ensure back-end infrastructure exists
           command: |
@@ -318,11 +322,11 @@ workflows:
           requires: [build-backend]
       - scan-frontend:
           requires: [build-frontend]
-      # - deploy-infrastructure:
-      #     requires: [test-frontend, test-backend, scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [test-feature-branch]
+      - deploy-infrastructure:
+          requires: [test-frontend, test-backend, scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [chester]
       # - configure-infrastructure:
       #     requires: [deploy-infrastructure]
       # - run-migrations:
