@@ -1,17 +1,55 @@
 version: 2.1
 
-# commands:
-#   destroy-environment:
-#     description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
-#     parameters:
-#       # Add parameter here   
-#     steps:
-#       - run:
-#           name: Destroy environments
-#           when: on_fail
-#           command: |
-#             # Your code here
-#             exit 1
+commands:
+  destroy-environment:
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
+    parameters:
+      Workflow_ID:
+        type: string
+        default: ${CIRCLE_WORKFLOW_ID:0:7}
+      # Add parameter here   
+    steps:
+      - run:
+          name: Destroy environments
+          when: on_fail
+          command: |
+              aws cloudformation delete-stack --stack-name udapeople-backend-<<parameters.Workflow_ID>>
+              aws s3 rm s3://udapeople-<<parameters.Workflow_ID>> --recursive
+              aws cloudformation delete-stack --stack-name udapeople-frontend-<<parameters.Workflow_ID>>
+
+  install_awscli:
+    description: Install AWS CLI v2
+    steps:
+      - run:
+          name: Install AWS CLI v2
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+
+  install_nodejs:
+    description: Install Node.js 13.8.0
+    steps:
+      - run:
+          name: Install Node.js 13.8.0
+          command: |
+            # Install Node.js LTS version as our base Node.js version
+            curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+            sudo apt install -y nodejs
+
+            # Use n version manager to use Node.js v13.8.0
+            sudo npm install --global n
+            sudo n 13.8.0
+
+  install_ansible:
+    description: Install Ansible
+    steps:
+      - run:
+          name: Install Ansible
+          command: |
+            sudo apt-get install python3-pip
+            python3 -m pip install --user ansible
+
 
 #   revert-migrations:
 #     description: Revert the last migration if successfully run in the current workflow.
@@ -130,6 +168,8 @@ jobs:
             npm audit fix --force --audit-level=critical
             npm audit --audit-level=critical
 
+
+
   deploy-infrastructure:
     docker:
 
@@ -139,18 +179,28 @@ jobs:
       # Checkout code from git
       - checkout
       - install_awscli
+
+      # - run:
+      #     name: Install AWS CLI v2
+      #     command: |
+      #       curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      #       unzip awscliv2.zip
+      #       sudo ./aws/install 
+
       - run:
           name: Ensure back-end infrastructure exists
           command: |
+
             aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
               --tags project=udapeople \
               --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  
-              
+
       - run:
           name: Ensure front-end infrastructure exist
           command: |
+
             aws cloudformation deploy \
               --template-file .circleci/files/frontend.yml \
               --tags project=udapeople\
@@ -171,26 +221,38 @@ jobs:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
+
+      - destroy-environment
       # Here's where you will add some code to rollback on failure      
 
-#   configure-infrastructure:
-#     docker:
-#       # Docker image here that supports Ansible
-#     steps:
-#       # Checkout code from git
-#       # Add ssh keys with fingerprint
-#       # attach workspace
-#       - run:
-#           name: Install dependencies
-#           command: |
-#             # Your code here
-#             exit 1
-#       - run:
-#           name: Configure server
-#           command: |
-#             # Your code here
-#             exit 1
-#       # Here's where you will add some code to rollback on failure      
+  configure-infrastructure:
+    docker:
+      - image: cimg/base:stable
+      # Docker image here that supports Ansible
+    steps:
+      - checkout
+      - install_ansible
+      # Checkout code from git
+      - add_ssh_keys:
+          fingerprints: ["02:95:f0:3c:05:f7:be:37:f3:ea:d8:50:c9:55:2a:98"]
+      # Add ssh keys with fingerprint
+      - attach_workspace:
+          at: ~/
+      # attach workspace
+      # - run:
+      #     name: Install dependencies
+      #     command: |
+      #       # Your code here
+      #       exit 1
+      - run:
+          name: Configure server
+          command: |
+            cd .circleci/ansible
+            cat inventory.txt
+            ansible-playbook -i inventory.txt configure-server.yml
+      - destroy-environment
+
+      # Here's where you will add some code to rollback on failure      
 
 #   run-migrations:
 #     docker:
@@ -322,9 +384,9 @@ workflows:
           requires: [test-frontend, test-backend, scan-frontend, scan-backend]
           filters:
             branches:
-              only: [chester]
-      # - configure-infrastructure:
-      #     requires: [deploy-infrastructure]
+              only: [United]
+      - configure-infrastructure:
+          requires: [deploy-infrastructure]
       # - run-migrations:
       #     requires: [configure-infrastructure]
       # - deploy-frontend:
